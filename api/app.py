@@ -35,7 +35,10 @@ class ChatRequest(BaseModel):
 async def chat(request: ChatRequest):
     try:
         # Initialize OpenAI client with the provided API key
-        client = OpenAI(api_key=request.api_key)
+        client = OpenAI(
+            api_key=request.api_key,
+            base_url="https://api.openai.com/v1"  # Explicitly set the base URL for project keys
+        )
         
         # Create an async generator function for streaming responses
         async def generate():
