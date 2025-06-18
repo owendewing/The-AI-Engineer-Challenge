@@ -111,38 +111,38 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-cream p-4">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-forest-green mb-8 text-center">AI Chat Interface</h1>
+    <main className="min-h-screen p-4">
+      <div className="max-w-5xl mx-auto">
+        <h1 className="text-4xl font-bold text-white mb-8 text-center">Owen's Chatbot</h1>
         
-        <div className="mb-8 p-4 bg-white rounded-lg shadow-md">
-          <label htmlFor="apiKey" className="block text-forest-green mb-2">Enter your OpenAI API Key:</label>
+        <div className="mb-8 p-6 bg-white rounded-xl shadow-lg border border-forest-green/10">
+          <label htmlFor="apiKey" className="block text-forest-green text-lg font-semibold mb-2">Enter your OpenAI API Key:</label>
           <input
             type="password"
             id="apiKey"
             value={apiKey}
             onChange={handleApiKeyChange}
-            className={`w-full p-2 border rounded focus:outline-none focus:ring-2 ${
+            className={`w-full p-3 border-2 rounded-lg focus:outline-none focus:ring-2 ${
               apiKey && !isValidApiKey 
                 ? 'border-red-500 focus:ring-red-500' 
-                : 'border-gray-300 focus:ring-forest-green'
+                : 'border-forest-green/20 focus:ring-forest-green'
             }`}
             placeholder="sk-..."
           />
           {apiKey && !isValidApiKey && (
-            <p className="text-red-500 text-sm mt-1">Please enter a valid OpenAI API key (should start with sk-, not sk-proj-)</p>
+            <p className="text-red-500 text-sm mt-2">Please enter a valid OpenAI API key (should start with sk-, not sk-proj-)</p>
           )}
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-4 mb-4 h-[60vh] overflow-y-auto">
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-6 h-[70vh] overflow-y-auto border border-forest-green/10">
           {messages.map((message, index) => (
             <div
               key={index}
-              className={`mb-4 p-3 rounded-lg ${
+              className={`mb-4 p-4 rounded-xl ${
                 message.role === 'user'
                   ? 'bg-forest-green text-cream ml-auto'
-                  : 'bg-gray-100 text-forest-green'
-              } max-w-[80%] ${message.role === 'user' ? 'ml-auto' : 'mr-auto'}`}
+                  : 'bg-cream/50 text-forest-green border border-forest-green/10'
+              } max-w-[85%] ${message.role === 'user' ? 'ml-auto' : 'mr-auto'} shadow-sm`}
             >
               {message.content}
             </div>
@@ -150,19 +150,19 @@ export default function Home() {
           <div ref={messagesEndRef} />
         </div>
 
-        <form onSubmit={handleSubmit} className="flex gap-2">
+        <form onSubmit={handleSubmit} className="flex gap-3">
           <input
             type="text"
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             placeholder="Type your message..."
-            className="flex-1 p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-forest-green"
+            className="flex-1 p-4 border-2 border-forest-green/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-forest-green text-lg"
             disabled={!isValidApiKey || isLoading}
           />
           <button
             type="submit"
             disabled={!isValidApiKey || isLoading || !inputMessage.trim()}
-            className="bg-forest-green text-cream p-2 rounded hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-cream text-forest-green p-4 rounded-lg hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-md"
           >
             <PaperAirplaneIcon className="h-6 w-6" />
           </button>
