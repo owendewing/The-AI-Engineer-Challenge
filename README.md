@@ -1,4 +1,4 @@
-<p align = "center" draggable=”false” ><img src="https://github.com/AI-Maker-Space/LLM-Dev-101/assets/37101144/d1343317-fa2f-41e1-8af1-1dbb18399719" 
+<p align = "center" draggable="false" ><img src="https://github.com/AI-Maker-Space/LLM-Dev-101/assets/37101144/d1343317-fa2f-41e1-8af1-1dbb18399719" 
      width="200px"
      height="auto"/>
 </p>
@@ -89,7 +89,7 @@ Got everything in place? Let's move on!
 While it is a bit counter-intuitive to set things up before jumping into vibe-coding - it's important to remember that there exists a gradient betweeen AI-Assisted Development and Vibe-Coding. We're only reaching *slightly* into AI-Assisted Development for this challenge, but it's worth it!
 
 1. Check out the rules in `.cursor/rules/` and add theme-ing information like colour schemes in `frontend-rule.mdc`! You can be as expressive as you'd like in these rules!
-2. We're going to index some docs to make our application more likely to succeed. To do this - we're going to start with `CTRL+SHIFT+P` (or `CMD+SHIFT+P` on Mac) and we're going to type "custom doc" into the search bar. 
+2. We're going to index some docs to make our application more likely to succeed. To this - we're going to start with `CTRL+SHIFT+P` (or `CMD+SHIFT+P` on Mac) and we're going to type "custom doc" into the search bar. 
 
      ![image](https://i.imgur.com/ILx3hZu.png)
 3. We're then going to copy and paste `https://nextjs.org/docs` into the prompt.
@@ -128,6 +128,10 @@ While it is a bit counter-intuitive to set things up before jumping into vibe-co
 <details>
   <summary>🚀 Deploying Your First LLM-powered Application with Vercel</summary>
 
+🎉 **Great News!** This application is now fully configured for Vercel deployment! Both the frontend and backend are set up to work seamlessly together on Vercel's platform.
+
+### Quick Deploy Steps:
+
 1. Ensure you have signed into [Vercel](https://vercel.com/) with your GitHub account.
 
 2. Ensure you have `npm` (this may have been installed in the previous vibe-coding step!) - if you need help with that, ask Cursor!
@@ -150,6 +154,12 @@ While it is a bit counter-intuitive to set things up before jumping into vibe-co
 
 6. Once the build is completed - head to the provided link and try out your app!
 
+### What's Included:
+- ✅ **Frontend**: Next.js application with modern UI
+- ✅ **Backend**: FastAPI server with OpenAI integration
+- ✅ **Configuration**: Proper Vercel setup for both frontend and backend
+- ✅ **API Integration**: Frontend automatically connects to the deployed backend
+
 > NOTE: Remember, if you run into any errors - ask Cursor to help you fix them!
 
 </details>
@@ -171,14 +181,14 @@ Here's a template to get your post started!
 ```
 🚀🎉 Exciting News! 🎉🚀
 
-🏗️ Today, I'm thrilled to announce that I've successfully built and shipped my first-ever LLM using the powerful combination of , and the OpenAI API! 🖥️
+🏗️ Today, I'm thrilled to announce that I've successfully built and shipped my first-ever LLM using the powerful combination of , and the OpenAI API! 🖥️
 
 Check it out 👇
 [LINK TO APP]
 
 A big shoutout to the @AI Makerspace for all making this possible. Couldn't have done it without the incredible community there. 🤗🙏
 
-Looking forward to building with the community! 🙌✨ Here's to many more creations ahead! 🥂🎉
+Looking forward to building with the community! 🙌✨ Here's to many more creations ahead! 🥂🎉
 
 Who else is diving into the world of AI? Let's connect! 🌐💡
 
