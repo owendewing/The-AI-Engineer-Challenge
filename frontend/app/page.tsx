@@ -41,8 +41,8 @@ export default function Home() {
 
     try {
       console.log('Attempting to connect to backend...');
-      // First check if the backend is accessible
-      const healthCheck = await fetch('http://127.0.0.1:8000/api/health', {
+      // First check if the backend is accessible using relative URL
+      const healthCheck = await fetch('/api/health', {
         method: 'GET',
         mode: 'cors',
         headers: {
@@ -56,7 +56,7 @@ export default function Home() {
       }
 
       console.log('Sending chat request...');
-      const response = await fetch('http://127.0.0.1:8000/api/chat', {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         mode: 'cors',
         headers: {
@@ -127,10 +127,10 @@ export default function Home() {
                 ? 'border-red-500 focus:ring-red-500' 
                 : 'border-forest-green/20 focus:ring-forest-green'
             }`}
-            placeholder="sk-..."
+            placeholder="sk-... or sk-proj-..."
           />
           {apiKey && !isValidApiKey && (
-            <p className="text-red-500 text-sm mt-2">Please enter a valid OpenAI API key (should start with sk-, not sk-proj-)</p>
+            <p className="text-red-500 text-sm mt-2">Please enter a valid OpenAI API key (should start with sk- or sk-proj-)</p>
           )}
         </div>
 

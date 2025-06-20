@@ -7,7 +7,12 @@ from pydantic import BaseModel
 # Import OpenAI client for interacting with OpenAI's API
 from openai import OpenAI
 import os
+import logging
 from typing import Optional
+
+# Configure logging for better debugging on Vercel
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Initialize FastAPI application with a title
 app = FastAPI(title="OpenAI Chat API")
@@ -34,6 +39,8 @@ class ChatRequest(BaseModel):
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
     try:
+        logger.info(f"Received chat request with model: {request.model}")
+        
         # Initialize OpenAI client with the provided API key
         client = OpenAI(
             api_key=request.api_key,
@@ -42,31 +49,37 @@ async def chat(request: ChatRequest):
         
         # Create an async generator function for streaming responses
         async def generate():
-            # Create a streaming chat completion request
-            stream = client.chat.completions.create(
-                model=request.model,
-                messages=[
-                    {"role": "developer", "content": request.developer_message},
-                    {"role": "user", "content": request.user_message}
-                ],
-                stream=True  # Enable streaming response
-            )
-            
-            # Yield each chunk of the response as it becomes available
-            for chunk in stream:
-                if chunk.choices[0].delta.content is not None:
-                    yield chunk.choices[0].delta.content
+            try:
+                # Create a streaming chat completion request
+                stream = client.chat.completions.create(
+                    model=request.model,
+                    messages=[
+                        {"role": "developer", "content": request.developer_message},
+                        {"role": "user", "content": request.user_message}
+                    ],
+                    stream=True  # Enable streaming response
+                )
+                
+                # Yield each chunk of the response as it becomes available
+                for chunk in stream:
+                    if chunk.choices[0].delta.content is not None:
+                        yield chunk.choices[0].delta.content
+            except Exception as e:
+                logger.error(f"Error in streaming response: {str(e)}")
+                yield f"Error: {str(e)}"
 
         # Return a streaming response to the client
         return StreamingResponse(generate(), media_type="text/plain")
     
     except Exception as e:
+        logger.error(f"Error in chat endpoint: {str(e)}")
         # Handle any errors that occur during processing
         raise HTTPException(status_code=500, detail=str(e))
 
 # Define a health check endpoint to verify API status
 @app.get("/api/health")
 async def health_check():
+    logger.info("Health check endpoint called")
     return {"status": "ok"}
 
 # Entry point for running the application directly
