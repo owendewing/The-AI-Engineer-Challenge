@@ -41,8 +41,8 @@ export default function Home() {
 
     try {
       console.log('Attempting to connect to backend...');
-      // First check if the backend is accessible using relative URL
-      const healthCheck = await fetch('/api/health', {
+      // First check if the backend is accessible using the correct backend URL
+      const healthCheck = await fetch('http://localhost:8000/api/health', {
         method: 'GET',
         mode: 'cors',
         headers: {
@@ -56,7 +56,7 @@ export default function Home() {
       }
 
       console.log('Sending chat request...');
-      const response = await fetch('/api/chat', {
+      const response = await fetch('http://localhost:8000/api/chat', {
         method: 'POST',
         mode: 'cors',
         headers: {
