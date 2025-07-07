@@ -1,5 +1,5 @@
 # Import required FastAPI components for building the API
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 # Import Pydantic for data validation and settings management
@@ -12,13 +12,17 @@ from typing import Optional
 import tempfile
 import shutil
 
+# Configure logging for better debugging on Vercel
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Import aimakerspace components for RAG functionality
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'aimakerspace'))
 try:
-    from text_utils import PDFLoader, CharacterTextSplitter
-    from vectordatabase import VectorDatabase
-    from openai_utils.embedding import EmbeddingModel
+    from aimakerspace.text_utils import PDFLoader, CharacterTextSplitter
+    from aimakerspace.vectordatabase import VectorDatabase
+    from aimakerspace.openai_utils.embedding import EmbeddingModel
 except ImportError as e:
     logger.error(f"Failed to import aimakerspace modules: {e}")
     # Fallback imports for development
@@ -26,10 +30,6 @@ except ImportError as e:
     CharacterTextSplitter = None
     VectorDatabase = None
     EmbeddingModel = None
-
-# Configure logging for better debugging on Vercel
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # Initialize FastAPI application with a title
 app = FastAPI(title="OpenAI Chat API")
@@ -105,15 +105,19 @@ async def chat(request: ChatRequest):
 
 # Define PDF upload endpoint
 @app.post("/api/upload-pdf")
-async def upload_pdf(file: UploadFile = File(...), api_key: str = None):
+async def upload_pdf(file: UploadFile = File(...), api_key: str = Form(None)):
     global vector_db, processed_documents
     
     try:
         logger.info(f"Received PDF upload: {file.filename}")
         
         # Validate file type
-        if not file.filename.lower().endswith('.pdf'):
+        if not file.filename or not file.filename.lower().endswith('.pdf'):
             raise HTTPException(status_code=400, detail="Only PDF files are supported")
+        
+        from aimakerspace.text_utils import PDFLoader, CharacterTextSplitter
+        from aimakerspace.vectordatabase import VectorDatabase
+        from aimakerspace.openai_utils.embedding import EmbeddingModel
         
         # Create temporary file to store the uploaded PDF
         with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
@@ -134,8 +138,8 @@ async def upload_pdf(file: UploadFile = File(...), api_key: str = None):
             
             logger.info(f"Extracted {len(chunks)} chunks from PDF")
             
-            # Initialize vector database with embeddings
-            embedding_model = EmbeddingModel()
+            # Initialize vector database with embeddings, passing the user's API key
+            embedding_model = EmbeddingModel(api_key=api_key)
             vector_db = VectorDatabase(embedding_model)
             
             # Build vector database from chunks
@@ -175,33 +179,41 @@ async def rag_chat(request: RAGChatRequest):
             k=3, 
             return_as_text=True
         )
-        
+        # If not returning as text, extract the text part from the tuple
+        if not all(isinstance(chunk, str) for chunk in relevant_chunks):
+            relevant_chunks = [chunk[0] for chunk in relevant_chunks]
         # Create context from relevant chunks
-        context = "\n\n".join(relevant_chunks)
+        context = "\n\n".join(
+            chunk if isinstance(chunk, str) else chunk[0]
+            for chunk in relevant_chunks
+        )
         
-        # Initialize OpenAI client
+        # Initialize OpenAI client with user's API key
         client = OpenAI(
             api_key=request.api_key,
             base_url="https://api.openai.com/v1"
         )
         
         # Create system message with context
-        system_message = f"""You are a helpful AI assistant that answers questions based on the provided document context. 
-        
-        Document Context:
-        {context}
-        
-        Please answer the user's question based on the information in the document context. If the answer cannot be found in the context, say so clearly. Be concise and accurate.
-        
-        **Important**: Format your responses using markdown for better readability:
-        - Use **bold** for emphasis
-        - Use *italics* for secondary emphasis
-        - Use bullet points (• or -) for lists
-        - Use numbered lists when appropriate
-        - Use `code` for technical terms or file names
-        - Use ```code blocks``` for longer code examples
-        - Use > for quotes or important notes
-        - Use proper line breaks and spacing"""
+        system_message = f"""
+You are a helpful AI assistant that answers questions based on the provided document context.
+
+Document Context:
+{context}
+
+Please answer the user's question based on the information in the document context. If the answer cannot be found in the context, say so clearly. Be concise and accurate.
+
+**Important:** Format your responses using markdown for better readability:
+- Use **bold** for emphasis
+- Use *italics* for secondary emphasis
+- Use bullet points (with `-` or `*`) for lists
+- Use numbered lists when appropriate
+- Use `code` for technical terms or file names
+- Use triple backticks for code blocks
+- Use `>` for blockquotes
+- **Always put a blank line between paragraphs and between list items for proper spacing**
+- If you use a list, put a blank line before and after the list
+"""
         
         # Create an async generator function for streaming responses
         async def generate():
