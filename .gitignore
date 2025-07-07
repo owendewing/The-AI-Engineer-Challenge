@@ -166,3 +166,13 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 .vercel
+
+# Next.js build output
+.next/
+frontend/.next/
+# Webpack cache
+webpack/
+frontend/webpack/
+# Trace files
+trace
+trace.json
