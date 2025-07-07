@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { PaperAirplaneIcon } from '@heroicons/react/24/solid';
+import { PaperAirplaneIcon, DocumentArrowUpIcon } from '@heroicons/react/24/solid';
 
 export default function Home() {
   const [apiKey, setApiKey] = useState('');
@@ -9,7 +9,12 @@ export default function Home() {
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isValidApiKey, setIsValidApiKey] = useState(false);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [pdfStatus, setPdfStatus] = useState<{ pdf_loaded: boolean; chunks_count: number }>({ pdf_loaded: false, chunks_count: 0 });
+  const [isUploading, setIsUploading] = useState(false);
+  const [chatMode, setChatMode] = useState<'regular' | 'rag'>('regular');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const validateApiKey = (key: string) => {
     // Accept both personal API keys (sk-) and project keys (sk-proj-)
@@ -30,6 +35,76 @@ export default function Home() {
     scrollToBottom();
   }, [messages]);
 
+  // Check PDF status on component mount
+  useEffect(() => {
+    checkPdfStatus();
+  }, []);
+
+  const checkPdfStatus = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/pdf-status');
+      if (response.ok) {
+        const status = await response.json();
+        setPdfStatus(status);
+        if (status.pdf_loaded) {
+          setChatMode('rag');
+        }
+      }
+    } catch (error) {
+      console.log('No PDF loaded yet');
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type === 'application/pdf') {
+      setPdfFile(file);
+    } else if (file) {
+      alert('Please select a PDF file');
+    }
+  };
+
+  const handleFileUpload = async () => {
+    if (!pdfFile || !isValidApiKey) return;
+
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', pdfFile);
+
+      const response = await fetch('http://localhost:8000/api/upload-pdf', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('PDF uploaded successfully:', result);
+        setChatMode('rag');
+        await checkPdfStatus();
+        setMessages(prev => [...prev, { 
+          role: 'assistant', 
+          content: `PDF "${pdfFile.name}" uploaded and processed successfully! You can now ask questions about the document.` 
+        }]);
+      } else {
+        const error = await response.json();
+        throw new Error(error.detail || 'Failed to upload PDF');
+      }
+    } catch (error) {
+      console.error('Error uploading PDF:', error);
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: `Error uploading PDF: ${error instanceof Error ? error.message : 'Unknown error'}` 
+      }]);
+    } finally {
+      setIsUploading(false);
+      setPdfFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputMessage.trim() || !isValidApiKey) return;
@@ -41,34 +116,40 @@ export default function Home() {
 
     try {
       console.log('Attempting to connect to backend...');
-      // First check if the backend is accessible using the correct backend URL
-      const healthCheck = await fetch('http://localhost:8000/api/health', {
-        method: 'GET',
-        mode: 'cors',
-        headers: {
-          'Accept': 'application/json',
-        },
-      });
       
-      console.log('Health check response:', healthCheck.status);
-      if (!healthCheck.ok) {
-        throw new Error('Backend server is not responding');
+      let response;
+      if (chatMode === 'rag') {
+        // Use RAG chat endpoint
+        console.log('Using RAG chat...');
+        response = await fetch('http://localhost:8000/api/rag-chat', {
+          method: 'POST',
+          mode: 'cors',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({
+            user_message: inputMessage,
+            api_key: apiKey,
+          }),
+        });
+      } else {
+        // Use regular chat endpoint
+        console.log('Using regular chat...');
+        response = await fetch('http://localhost:8000/api/chat', {
+          method: 'POST',
+          mode: 'cors',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({
+            developer_message: 'You are a helpful AI assistant.',
+            user_message: inputMessage,
+            api_key: apiKey,
+          }),
+        });
       }
-
-      console.log('Sending chat request...');
-      const response = await fetch('http://localhost:8000/api/chat', {
-        method: 'POST',
-        mode: 'cors',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          developer_message: 'You are a helpful AI assistant.',
-          user_message: inputMessage,
-          api_key: apiKey,
-        }),
-      });
 
       console.log('Chat response status:', response.status);
 
@@ -110,6 +191,10 @@ export default function Home() {
     }
   };
 
+  const clearChat = () => {
+    setMessages([]);
+  };
+
   return (
     <main className="min-h-screen p-4">
       <div className="max-w-5xl mx-auto">
@@ -134,7 +219,72 @@ export default function Home() {
           )}
         </div>
 
+        {/* PDF Upload Section */}
+        <div className="mb-8 p-6 bg-white rounded-xl shadow-lg border border-forest-green/10">
+          <h2 className="text-forest-green text-lg font-semibold mb-4">Upload PDF Document</h2>
+          <div className="flex gap-4 items-center">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf"
+              onChange={handleFileChange}
+              className="flex-1 p-2 border-2 border-forest-green/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-forest-green"
+            />
+            <button
+              onClick={handleFileUpload}
+              disabled={!pdfFile || !isValidApiKey || isUploading}
+              className="bg-forest-green text-cream px-6 py-2 rounded-lg hover:bg-opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center gap-2"
+            >
+              <DocumentArrowUpIcon className="h-5 w-5" />
+              {isUploading ? 'Uploading...' : 'Upload'}
+            </button>
+          </div>
+          {pdfStatus.pdf_loaded && (
+            <p className="text-green-600 text-sm mt-2">
+              ✓ PDF loaded with {pdfStatus.chunks_count} text chunks
+            </p>
+          )}
+        </div>
+
+        {/* Chat Mode Toggle */}
+        <div className="mb-6 flex gap-4">
+          <button
+            onClick={() => setChatMode('regular')}
+            className={`px-4 py-2 rounded-lg transition-all duration-200 ${
+              chatMode === 'regular'
+                ? 'bg-forest-green text-cream'
+                : 'bg-cream text-forest-green border border-forest-green/20'
+            }`}
+          >
+            Regular Chat
+          </button>
+          <button
+            onClick={() => setChatMode('rag')}
+            disabled={!pdfStatus.pdf_loaded}
+            className={`px-4 py-2 rounded-lg transition-all duration-200 ${
+              chatMode === 'rag'
+                ? 'bg-forest-green text-cream'
+                : 'bg-cream text-forest-green border border-forest-green/20'
+            } ${!pdfStatus.pdf_loaded ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            Chat with PDF
+          </button>
+          <button
+            onClick={clearChat}
+            className="px-4 py-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-all duration-200"
+          >
+            Clear Chat
+          </button>
+        </div>
+
         <div className="bg-white rounded-xl shadow-lg p-6 mb-6 h-[70vh] overflow-y-auto border border-forest-green/10">
+          {messages.length === 0 && (
+            <div className="text-center text-gray-500 mt-8">
+              {chatMode === 'rag' && pdfStatus.pdf_loaded 
+                ? 'Ask questions about your uploaded PDF document!'
+                : 'Start a conversation or upload a PDF to chat with it!'}
+            </div>
+          )}
           {messages.map((message, index) => (
             <div
               key={index}
@@ -155,7 +305,7 @@ export default function Home() {
             type="text"
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
-            placeholder="Type your message..."
+            placeholder={chatMode === 'rag' ? "Ask about your PDF..." : "Type your message..."}
             className="flex-1 p-4 border-2 border-forest-green/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-forest-green text-lg"
             disabled={!isValidApiKey || isLoading}
           />
