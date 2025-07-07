@@ -81,7 +81,7 @@ async def chat(request: ChatRequest):
                 stream = client.chat.completions.create(
                     model=request.model or "gpt-4.1-mini",
                     messages=[
-                        {"role": "developer", "content": request.developer_message},
+                        {"role": "developer", "content": request.developer_message + "\n\n**Important**: Format your responses using markdown for better readability:\n- Use **bold** for emphasis\n- Use *italics* for secondary emphasis\n- Use bullet points (• or -) for lists\n- Use numbered lists when appropriate\n- Use `code` for technical terms or file names\n- Use ```code blocks``` for longer code examples\n- Use > for quotes or important notes\n- Use proper line breaks and spacing"},
                         {"role": "user", "content": request.user_message}
                     ],
                     stream=True  # Enable streaming response
@@ -191,7 +191,17 @@ async def rag_chat(request: RAGChatRequest):
         Document Context:
         {context}
         
-        Please answer the user's question based on the information in the document context. If the answer cannot be found in the context, say so clearly. Be concise and accurate."""
+        Please answer the user's question based on the information in the document context. If the answer cannot be found in the context, say so clearly. Be concise and accurate.
+        
+        **Important**: Format your responses using markdown for better readability:
+        - Use **bold** for emphasis
+        - Use *italics* for secondary emphasis
+        - Use bullet points (• or -) for lists
+        - Use numbered lists when appropriate
+        - Use `code` for technical terms or file names
+        - Use ```code blocks``` for longer code examples
+        - Use > for quotes or important notes
+        - Use proper line breaks and spacing"""
         
         # Create an async generator function for streaming responses
         async def generate():

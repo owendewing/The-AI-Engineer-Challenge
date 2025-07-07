@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { PaperAirplaneIcon, DocumentArrowUpIcon } from '@heroicons/react/24/solid';
+import MarkdownRenderer from './components/MarkdownRenderer';
 
 export default function Home() {
   const [apiKey, setApiKey] = useState('');
@@ -294,7 +295,11 @@ export default function Home() {
                   : 'bg-cream/50 text-forest-green border border-forest-green/10'
               } max-w-[85%] ${message.role === 'user' ? 'ml-auto' : 'mr-auto'} shadow-sm`}
             >
-              {message.content}
+              {message.role === 'user' ? (
+                <div className="whitespace-pre-wrap">{message.content}</div>
+              ) : (
+                <MarkdownRenderer content={message.content} />
+              )}
             </div>
           ))}
           <div ref={messagesEndRef} />
