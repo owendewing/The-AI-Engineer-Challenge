@@ -1,6 +1,7 @@
 import os
 from typing import List
 import PyPDF2
+import csv
 
 
 class TextFileLoader:
@@ -119,6 +120,28 @@ class PDFLoader:
     def load_documents(self):
         self.load()
         return self.documents
+
+
+# CSVLoader: loads a CSV and serializes each row as a text chunk
+class CSVLoader:
+    """
+    Loads a CSV file and serializes each row as a text chunk for RAG.
+    Each row is converted to a string like 'Title: Imagine, Artist: John Lennon, ...'.
+    """
+    def __init__(self, path: str):
+        self.path = path
+        self.chunks = []
+
+    def load(self):
+        with open(self.path, newline='', encoding='utf-8') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                chunk = ', '.join(f"{k}: {v}" for k, v in row.items() if v)
+                self.chunks.append(chunk)
+
+    def load_documents(self):
+        self.load()
+        return self.chunks
 
 
 if __name__ == "__main__":

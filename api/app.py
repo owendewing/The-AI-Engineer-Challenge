@@ -23,6 +23,7 @@ try:
     from aimakerspace.text_utils import PDFLoader, CharacterTextSplitter
     from aimakerspace.vectordatabase import VectorDatabase
     from aimakerspace.openai_utils.embedding import EmbeddingModel
+    from aimakerspace.text_utils import CSVLoader
 except ImportError as e:
     logger.error(f"Failed to import aimakerspace modules: {e}")
     # Fallback imports for development
@@ -30,6 +31,7 @@ except ImportError as e:
     CharacterTextSplitter = None
     VectorDatabase = None
     EmbeddingModel = None
+    CSVLoader = None
 
 # Initialize FastAPI application with a title
 app = FastAPI(title="OpenAI Chat API")
@@ -44,7 +46,7 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers in requests
 )
 
-# Global variables to store the vector database and processed documents
+# Global vector_db for storing the current document's vector database
 vector_db = None
 processed_documents = []
 
@@ -162,86 +164,81 @@ async def upload_pdf(file: UploadFile = File(...), api_key: str = Form(None)):
         logger.error(f"Error processing PDF: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-# Define RAG chat endpoint
-@app.post("/api/rag-chat")
-async def rag_chat(request: RAGChatRequest):
-    global vector_db, processed_documents
-    
+# Define CSV upload endpoint
+@app.post("/api/upload-csv")
+async def upload_csv(file: UploadFile = File(...), api_key: str = Form(None)):
+    logger.info(f"Received CSV upload: {file.filename}")
+    if not file.filename or not file.filename.lower().endswith('.csv'):
+        raise HTTPException(status_code=400, detail="Only CSV files are supported")
     try:
-        logger.info(f"Received RAG chat request with model: {request.model}")
-        
-        if vector_db is None or not processed_documents:
-            raise HTTPException(status_code=400, detail="No PDF has been uploaded and processed yet")
-        
-        # Search for relevant documents
-        relevant_chunks = vector_db.search_by_text(
-            request.user_message, 
-            k=3, 
-            return_as_text=True
-        )
-        # If not returning as text, extract the text part from the tuple
-        if not all(isinstance(chunk, str) for chunk in relevant_chunks):
-            relevant_chunks = [chunk[0] for chunk in relevant_chunks]
-        # Create context from relevant chunks
-        context = "\n\n".join(
-            chunk if isinstance(chunk, str) else chunk[0]
-            for chunk in relevant_chunks
-        )
-        
-        # Initialize OpenAI client with user's API key
-        client = OpenAI(
-            api_key=request.api_key,
-            base_url="https://api.openai.com/v1"
-        )
-        
-        # Create system message with context
-        system_message = f"""
-You are a helpful AI assistant that answers questions based on the provided document context.
-
-Document Context:
-{context}
-
-Please answer the user's question based on the information in the document context. If the answer cannot be found in the context, say so clearly. Be concise and accurate.
-
-**Important:** Format your responses using markdown for better readability:
-- Use **bold** for emphasis
-- Use *italics* for secondary emphasis
-- Use bullet points (with `-` or `*`) for lists
-- Use numbered lists when appropriate
-- Use `code` for technical terms or file names
-- Use triple backticks for code blocks
-- Use `>` for blockquotes
-- **Always put a blank line between paragraphs and between list items for proper spacing**
-- If you use a list, put a blank line before and after the list
-"""
-        
-        # Create an async generator function for streaming responses
-        async def generate():
-            try:
-                # Create a streaming chat completion request
-                stream = client.chat.completions.create(
-                    model=request.model or "gpt-4.1-mini",
-                    messages=[
-                        {"role": "system", "content": system_message},
-                        {"role": "user", "content": request.user_message}
-                    ],
-                    stream=True
-                )
-                
-                # Yield each chunk of the response as it becomes available
-                for chunk in stream:
-                    if chunk.choices[0].delta.content is not None:
-                        yield chunk.choices[0].delta.content
-            except Exception as e:
-                logger.error(f"Error in RAG streaming response: {str(e)}")
-                yield f"Error: {str(e)}"
-
-        # Return a streaming response to the client
-        return StreamingResponse(generate(), media_type="text/plain")
-    
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as temp_file:
+            temp_file.write(await file.read())
+            temp_file_path = temp_file.name
+        csv_loader = CSVLoader(temp_file_path)
+        chunks = csv_loader.load_documents()
+        if not chunks:
+            raise HTTPException(status_code=400, detail="No data could be extracted from the CSV file")
+        # Chunking is not needed as each row is a chunk
+        logger.info(f"Extracted {len(chunks)} chunks from CSV file")
+        # Embed and index chunks for RAG
+        from aimakerspace.vectordatabase import VectorDatabase
+        from aimakerspace.openai_utils.embedding import EmbeddingModel
+        global vector_db
+        embedding_model = EmbeddingModel(api_key=api_key)
+        vector_db = await VectorDatabase(embedding_model).abuild_from_list(chunks)
+        logger.info("CSV successfully processed and indexed")
+        return {"message": "CSV uploaded and processed successfully", "chunks_count": len(chunks)}
     except Exception as e:
-        logger.error(f"Error in RAG chat endpoint: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Error processing CSV: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error processing CSV: {str(e)}")
+
+# CSV RAG chat endpoint
+@app.post("/api/rag-chat-csv")
+async def rag_chat_csv(user_message: str = Form(...), api_key: str = Form(None)):
+    if vector_db is None:
+        raise HTTPException(status_code=400, detail="No CSV has been uploaded and processed yet")
+    try:
+        # Retrieve relevant chunks
+        relevant_chunks = vector_db.search_by_text(user_message, k=5, return_as_text=True)
+        context = "\n".join(relevant_chunks) if relevant_chunks else ""
+        # Compose prompt for LLM
+        prompt = f"You are a helpful AI music assistant. Use the following song data to answer the user's question.\n\n{context}\n\nUser: {user_message}\nAssistant (in markdown):"
+        from aimakerspace.openai_utils.chatmodel import ChatOpenAI
+        chat = ChatOpenAI(api_key=api_key)
+        messages = [
+            {"role": "system", "content": "You are a helpful AI music assistant. Use the provided song data to answer user questions in markdown."},
+            {"role": "user", "content": prompt}
+        ]
+        response = chat.run(messages, text_only=True)
+        return {"response": response}
+    except Exception as e:
+        logger.error(f"Error in RAG CSV chat: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error in RAG CSV chat: {str(e)}")
+
+# PDF RAG chat endpoint
+@app.post("/api/rag-chat")
+async def rag_chat(user_message: str = Form(...), api_key: str = Form(None)):
+    global vector_db, processed_documents
+    if vector_db is None or not processed_documents:
+        raise HTTPException(status_code=400, detail="No PDF has been uploaded and processed yet")
+    try:
+        # Retrieve relevant chunks
+        relevant_chunks = vector_db.search_by_text(user_message, k=5, return_as_text=True)
+        context = "\n".join(relevant_chunks) if relevant_chunks else ""
+        # Compose prompt for LLM
+        prompt = f"You are a helpful AI assistant. Use the following PDF document context to answer the user's question.\n\n{context}\n\nUser: {user_message}\nAssistant (in markdown):"
+        from aimakerspace.openai_utils.chatmodel import ChatOpenAI
+        chat = ChatOpenAI(api_key=api_key)
+        messages = [
+            {"role": "system", "content": "You are a helpful AI assistant. Use the provided PDF document context to answer user questions in markdown."},
+            {"role": "user", "content": prompt}
+        ]
+        response = chat.run(messages, text_only=True)
+        return {"response": response}
+    except Exception as e:
+        logger.error(f"Error in RAG PDF chat: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error in RAG PDF chat: {str(e)}")
 
 # Define a health check endpoint to verify API status
 @app.get("/api/health")
